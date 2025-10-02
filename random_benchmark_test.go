@@ -3,7 +3,7 @@ package fastrand_test
 import (
 	crand "crypto/rand"
 	"fmt"
-	"github.com/SyNdicateFoundation/fastrand/fastrand"
+	"github.com/SyNdicateFoundation/fastrand"
 	"testing"
 )
 
