@@ -156,7 +156,7 @@ func Choice[T any](items []T) T {
 	return items[IntN(len(items))]
 }
 
-func ChoiceKey[T comparable](items map[T]struct{}) T {
+func ChoiceKey[T comparable, V any](items map[T]V) T {
 	if len(items) == 0 {
 		panic("fastrand: cannot choose from an empty map")
 	}
