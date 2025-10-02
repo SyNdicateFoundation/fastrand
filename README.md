@@ -210,7 +210,8 @@ template := "POST /api/v1/data HTTP/1.1\n" +
 // Generate the final data
 randomizedRequest := fastrand.RandomizerString(template)
 
-fmt.Println(randomizedRequest)```
+fmt.Println(randomizedRequest)
+```
 
 **Output of the `Randomizer` example:**
 ```
