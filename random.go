@@ -156,6 +156,27 @@ func Choice[T any](items []T) T {
 	return items[IntN(len(items))]
 }
 
+func ChoiceKey[T comparable](items map[T]struct{}) T {
+	if len(items) == 0 {
+		panic("fastrand: cannot choose from an empty map")
+	}
+
+	i := IntN(len(items))
+
+	for k := range items {
+		if i == 0 {
+			return k
+		}
+		i--
+	}
+
+	for k := range items {
+		return k
+	}
+
+	panic("unreachable")
+}
+
 func ChoiceItemNullable[T any](slice []T) (*T, error) {
 	if len(slice) == 0 {
 		return nil, errors.New("fastrand: cannot choose from an empty slice")
