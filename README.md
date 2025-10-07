@@ -5,7 +5,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **FastRand** is a powerful, high-performance, and developer-friendly Go library for generating random data. It provides a comprehensive suite of tools, from simple random numbers to complex, templated data generation. The library offers both a high-speed non-cryptographically secure generator (using PCG) and a cryptographically secure generator (using ChaCha8), making it suitable for a wide range of applications.
-
 ## Features
 
 -   **Dual Random Sources**: Choose between the blazing-fast PCG algorithm for general-purpose randomness and the secure ChaCha8 for cryptographic needs.
@@ -14,6 +13,7 @@
 -   **Rich Helper Functions**: One-line functions for common data types like `IPv4`, `IPv6`, `UUID`, `Hex`, and more.
 -   **Slice Manipulation**: Easily `Choice` an element, select `ChoiceMultiple` elements, or `Shuffle` a slice.
 -   **Powerful Randomizer Engine**: Generate complex data from a template string using placeholders like `{RAND;10;HEX}`.
+-   **Map Random Choice**: Use `ChoiceKey` to randomly choose a key from a map.
 -   **Concurrency Safe**: All functions are safe for concurrent use in goroutines.
 -   **Zero Dependencies**: Relies only on the Go standard library.
 
@@ -150,6 +150,11 @@ fmt.Printf("Secure Int: %d\nSecure Password: %s\nSecure Bytes: %v\n", s_int, pas
 ### Slices and Choices
 
 ```go
+// Choose one key from a map
+keyValueMap := map[string]int{"Alice": 1, "Bob": 2, "Charlie": 3, "Diana": 4}
+chosenKey := fastrand.ChoiceKey(keyValueMap)
+fmt.Printf("Chosen Key: %s\n", chosenKey)
+
 // Choose one element from a slice
 names := []string{"Alice", "Bob", "Charlie", "Diana"}
 chosenName := fastrand.Choice(names)
@@ -166,7 +171,6 @@ fastrand.Shuffle(len(numbers), func(i, j int) {
 })
 fmt.Printf("Shuffled: %v\n", numbers)
 ```
-
 ### Network and IDs
 
 ```go

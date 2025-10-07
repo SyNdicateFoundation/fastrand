@@ -188,6 +188,23 @@ func TestChoice(t *testing.T) {
 	})
 }
 
+func TestChoiceKey(t *testing.T) {
+	t.Parallel()
+	items := map[string]int{"a": 10, "b": 20, "c": 30}
+	counts := make(map[string]int)
+	for i := 0; i < numTestIterations*len(items); i++ {
+		choice := fastrand.ChoiceKey(items)
+		require.True(t, choice != "", "Chosen item %s must be in the original map %v", choice, items)
+		counts[choice]++
+	}
+
+	assert.Equal(t, len(items), len(counts), "Should have chosen all items at least once")
+
+	assert.PanicsWithValue(t, "fastrand: cannot choose from an empty map", func() {
+		fastrand.ChoiceKey(map[string]int{})
+	})
+}
+
 func TestChoiceItemNullable(t *testing.T) {
 	t.Parallel()
 	items := []string{"a", "b", "c"}
