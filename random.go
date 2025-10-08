@@ -13,16 +13,17 @@ import (
 	"unsafe"
 )
 
-type CharsList string
+type CharsList []byte
 
-const (
-	CharsSymbolChars    CharsList = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
-	CharsAlphabetLower  CharsList = "abcdefghijklmnopqrstuvwxyz"
-	CharsAlphabetUpper  CharsList = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	CharsDigits         CharsList = "0123456789"
-	CharsAlphabet                 = CharsAlphabetLower + CharsAlphabetUpper
-	CharsAlphabetDigits           = CharsAlphabet + CharsDigits
-	CharsAll                      = CharsAlphabetDigits + CharsSymbolChars
+var (
+	CharsNull           = CharsList{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	CharsSymbolChars    = CharsList("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~")
+	CharsAlphabetLower  = CharsList("abcdefghijklmnopqrstuvwxyz")
+	CharsAlphabetUpper  = CharsList("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	CharsDigits         = CharsList("0123456789")
+	CharsAlphabet       = append(CharsAlphabetLower, CharsAlphabetUpper...)
+	CharsAlphabetDigits = append(CharsAlphabet, CharsDigits...)
+	CharsAll            = append(CharsAlphabetDigits, CharsSymbolChars...)
 )
 
 type number interface {
@@ -137,15 +138,19 @@ func String(length int, charset CharsList) string {
 	if length <= 0 {
 		panic("fastrand: length must be positive")
 	}
-	cs := string(charset)
-	if cs == "" {
+
+	csLen := len(charset)
+
+	if csLen == 0 {
 		panic("fastrand: charset must not be empty")
 	}
+
 	b := make([]byte, length)
-	csLen := len(cs)
+
 	for i := 0; i < length; i++ {
-		b[i] = cs[IntN(csLen)]
+		b[i] = charset[IntN(csLen)]
 	}
+
 	return *(*string)(unsafe.Pointer(&b))
 }
 
@@ -162,16 +167,11 @@ func ChoiceKey[T comparable, V any](items map[T]V) T {
 	}
 
 	i := IntN(len(items))
-
 	for k := range items {
 		if i == 0 {
 			return k
 		}
 		i--
-	}
-
-	for k := range items {
-		return k
 	}
 
 	panic("unreachable")
@@ -193,15 +193,32 @@ func ChoiceMultiple[T any](items []T, count int) []T {
 	if n == 0 {
 		return []T{}
 	}
-	if count <= 0 || count > n {
-		count = n
+
+	if count <= 0 || count >= n {
+		shuffled := make([]T, n)
+		copy(shuffled, items)
+		pcgSrc.Shuffle(n, func(i, j int) {
+			shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+		})
+		return shuffled
 	}
-	shuffled := make([]T, n)
-	copy(shuffled, items)
+
+	chosen := make([]T, count)
+
+	indices := make([]int, n)
+	for i := 0; i < n; i++ {
+		indices[i] = i
+	}
+
 	pcgSrc.Shuffle(n, func(i, j int) {
-		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+		indices[i], indices[j] = indices[j], indices[i]
 	})
-	return shuffled[:count]
+
+	for i := 0; i < count; i++ {
+		chosen[i] = items[indices[i]]
+	}
+
+	return chosen
 }
 
 func IPv4() net.IP {
@@ -301,19 +318,23 @@ func SecureString(length int, charset CharsList) (string, error) {
 	if length <= 0 {
 		return "", errors.New("fastrand: length must be positive")
 	}
-	cs := string(charset)
-	if cs == "" {
+
+	csLen := len(charset)
+
+	if csLen == 0 {
 		return "", errors.New("fastrand: charset must not be empty")
 	}
+
 	b := make([]byte, length)
-	csLen := len(cs)
+
 	for i := range b {
 		idx, err := SecureIntN(csLen)
 		if err != nil {
 			return "", fmt.Errorf("fastrand: error getting secure index for string: %w", err)
 		}
-		b[i] = cs[idx]
+		b[i] = charset[idx]
 	}
+
 	return *(*string)(unsafe.Pointer(&b)), nil
 }
 

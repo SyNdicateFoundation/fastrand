@@ -162,3 +162,22 @@ func BenchmarkSecureStringFastRand(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkEngine(b *testing.B) {
+	engine := fastrand.NewEngine()
+	payload := []byte("User:{RAND;10-20;ABL,ABU}|Sess:{RAND;32;HEX}|ID:{RAND;UUID,HEX}|IP:{RAND;IPV4}|Data:{RAND;50,60,70}")
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = engine.Randomizer(payload)
+	}
+}
+
+func BenchmarkRandomizer(b *testing.B) {
+	payload := []byte("User: {RAND;10-20;ABL,ABU} | Session: {RANDOM;32;HEX} | ID: {RAND;UUID,HEX} | IP: {RAND;IPV4} | Data: {RAND;50-99} --- End")
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = fastrand.Randomizer(payload)
+	}
+}

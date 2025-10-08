@@ -132,7 +132,7 @@ func TestString(t *testing.T) {
 		{"Alphanum", 50, fastrand.CharsAlphabetDigits},
 		{"Symbols", 60, fastrand.CharsSymbolChars},
 		{"All", 100, fastrand.CharsAll},
-		{"Custom", 15, "abc"},
+		{"Custom", 15, fastrand.CharsList("abc")},
 	}
 
 	for _, tc := range testCases {
@@ -160,7 +160,7 @@ func TestString(t *testing.T) {
 		fastrand.String(-1, fastrand.CharsAlphabet)
 	})
 	assert.PanicsWithValue(t, "fastrand: charset must not be empty", func() {
-		fastrand.String(10, "")
+		fastrand.String(10, fastrand.CharsList(""))
 	})
 }
 
@@ -381,7 +381,7 @@ func TestSecureString(t *testing.T) {
 		{"SecureLower", 20, fastrand.CharsAlphabetLower},
 		{"SecureAlphanum", 50, fastrand.CharsAlphabetDigits},
 		{"SecureAll", 100, fastrand.CharsAll},
-		{"SecureCustom", 15, "abc"},
+		{"SecureCustom", 15, fastrand.CharsList("abc")},
 	}
 
 	for _, tc := range testCases {
@@ -412,7 +412,7 @@ func TestSecureString(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, "fastrand: length must be positive", err.Error())
 
-	_, err = fastrand.SecureString(10, "")
+	_, err = fastrand.SecureString(10, fastrand.CharsList(""))
 	require.Error(t, err)
 	assert.Equal(t, "fastrand: charset must not be empty", err.Error())
 }
@@ -721,4 +721,79 @@ func TestReaders(t *testing.T) {
 	assert.NotEqual(t, make([]byte, 16), b2)
 
 	assert.NotEqual(t, b1, b2)
+}
+
+func TestHex(t *testing.T) {
+	t.Parallel()
+	hexStr := fastrand.Hex(16)
+	assert.Len(t, hexStr, 32)
+	assert.Regexp(t, `^[a-f0-9]{32}$`, hexStr)
+}
+
+func TestSecureHex(t *testing.T) {
+	t.Parallel()
+	secureHexStr, err := fastrand.SecureHex(16)
+	require.NoError(t, err)
+	assert.Len(t, secureHexStr, 32)
+	assert.Regexp(t, `^[a-f0-9]{32}$`, secureHexStr)
+}
+
+func TestShuffle(t *testing.T) {
+	t.Parallel()
+	original := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	shuffled := make([]int, len(original))
+	copy(shuffled, original)
+
+	fastrand.Shuffle(len(shuffled), func(i, j int) {
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+	})
+
+	assert.ElementsMatch(t, original, shuffled)
+	if len(original) > 1 {
+		assert.NotEqual(t, original, shuffled, "Shuffle should change the order")
+	}
+}
+
+func TestPerm(t *testing.T) {
+	t.Parallel()
+	n := 10
+	perm := fastrand.Perm(n)
+	require.Len(t, perm, n)
+
+	seen := make(map[int]bool, n)
+	for _, v := range perm {
+		assert.False(t, seen[v], "Permutation should contain unique values")
+		seen[v] = true
+		assert.GreaterOrEqual(t, v, 0)
+		assert.Less(t, v, n)
+	}
+	assert.Equal(t, n, len(seen))
+}
+
+func TestMustFastUUID(t *testing.T) {
+	t.Parallel()
+	uuidBytes := fastrand.MustFastUUID()
+	assert.Len(t, uuidBytes, 16)
+	assert.NotEqual(t, make([]byte, 16), uuidBytes)
+
+	assert.Equal(t, byte(0x40), uuidBytes[6]&0xf0, "UUID version should be 4")
+	assert.Equal(t, byte(0x80), uuidBytes[8]&0xc0, "UUID variant should be RFC 4122")
+
+	assert.NotPanics(t, func() {
+		_ = fastrand.MustFastUUID()
+	})
+}
+
+func TestMustSecureUUID(t *testing.T) {
+	t.Parallel()
+	uuidBytes := fastrand.MustSecureUUID()
+	assert.Len(t, uuidBytes, 16)
+	assert.NotEqual(t, make([]byte, 16), uuidBytes)
+
+	assert.Equal(t, byte(0x40), uuidBytes[6]&0xf0, "UUID version should be 4")
+	assert.Equal(t, byte(0x80), uuidBytes[8]&0xc0, "UUID variant should be RFC 4122")
+
+	assert.NotPanics(t, func() {
+		_ = fastrand.MustSecureUUID()
+	})
 }
