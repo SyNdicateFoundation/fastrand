@@ -2,21 +2,22 @@ package fastrand_test
 
 import (
 	"bytes"
-	"github.com/SyNdicateFoundation/fastrand"
-	"net"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/SyNdicateFoundation/fastrand"
+	"net"
 )
 
-func checkCharset(tb testing.TB, b []byte, charset []byte) {
+func checkCharset(tb testing.TB, b []byte, charset fastrand.CharsList) {
 	tb.Helper()
 
 	charsetMap := make(map[byte]struct{}, len(charset))
 	for _, c := range charset {
-		charsetMap[c] = struct{}{}
+		charsetMap[byte(c)] = struct{}{}
 	}
 
 	for i, char := range b {
@@ -67,10 +68,9 @@ func checkEmailFormat(tb testing.TB, email []byte) {
 			tb.Errorf("Email domain %q not found in fastrand.SafeMailProviders list: %v", domain, fastrand.SafeMailProviders)
 		}
 	}
-
 }
 
-var uuidRegex = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$`)
+var uuidRegex = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
 
 func checkUUIDFormat(tb testing.TB, uuid []byte) {
 	tb.Helper()
@@ -112,7 +112,11 @@ func checkHexFormat(tb testing.TB, hexBytes []byte) {
 	}
 }
 
-var findPlaceholderRegex = regexp.MustCompile(`\{RAND(?:OM)?[^%]*}`)
+var findPlaceholderRegex = regexp.MustCompile(
+	`\{RAND(?:OM)?[^}]*\}` + `|` +
+		`%7BRAND(?:OM)?.*?%7D` + `|` +
+		`&lbrace;RAND(?:OM)?.*?&rbrace;`,
+)
 
 func TestRandomizer(t *testing.T) {
 
@@ -131,43 +135,43 @@ func TestRandomizer(t *testing.T) {
 			name:        "Default Random",
 			input:       "Data: {RAND}",
 			expectedLen: map[string]int{"{RAND}": 16},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RAND}": func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsAll)) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RAND}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsAll) }},
 		},
 		{
 			name:        "Default Random Optional OM",
 			input:       "Data: {RANDOM}",
 			expectedLen: map[string]int{"{RANDOM}": 16},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RANDOM}": func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsAll)) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RANDOM}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsAll) }},
 		},
 		{
 			name:        "Custom Length",
 			input:       "Key: {RAND;8}",
 			expectedLen: map[string]int{"{RAND;8}": 8},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;8}": func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsAll)) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;8}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsAll) }},
 		},
 		{
 			name:        "Alphabet Lower",
 			input:       "{RAND;10;ABL}",
 			expectedLen: map[string]int{"{RAND;10;ABL}": 10},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;10;ABL}": func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsAlphabetLower)) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;10;ABL}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsAlphabetLower) }},
 		},
 		{
 			name:        "Alphabet Upper",
 			input:       "Prefix-{RANDOM;5;ABU}-Suffix}",
 			expectedLen: map[string]int{"{RANDOM;5;ABU}": 5},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RANDOM;5;ABU}": func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsAlphabetUpper)) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RANDOM;5;ABU}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsAlphabetUpper) }},
 		},
 		{
 			name:        "Alphabet Mixed",
 			input:       "{RAND;12;ABR}",
 			expectedLen: map[string]int{"{RAND;12;ABR}": 12},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;12;ABR}": func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsAlphabet)) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;12;ABR}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsAlphabet) }},
 		},
 		{
 			name:        "Digits",
 			input:       "ID: {RAND;6;DIGIT}",
 			expectedLen: map[string]int{"{RAND;6;DIGIT}": 6},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;6;DIGIT}": func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsDigits)) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;6;DIGIT}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsDigits) }},
 		},
 		{
 			name:        "Hex",
@@ -179,7 +183,7 @@ func TestRandomizer(t *testing.T) {
 			name:        "Space",
 			input:       "A{RAND;5;SPACE}B",
 			expectedLen: map[string]int{"{RAND;5;SPACE}": 5},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;5;SPACE}": func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(" ")) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;5;SPACE}": func(tb testing.TB, b []byte) { checkCharset(tb, b, " ") }},
 		},
 		{
 			name:        "UUID",
@@ -191,7 +195,7 @@ func TestRandomizer(t *testing.T) {
 			name:        "NULL Bytes",
 			input:       "NUL:{RAND;7;NULL}",
 			expectedLen: map[string]int{"{RAND;7;NULL}": 7},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;7;NULL}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsNull) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;7;NULL}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsList(fastrand.CharsNull)) }},
 		},
 		{
 			name:        "IPv4",
@@ -221,10 +225,10 @@ func TestRandomizer(t *testing.T) {
 			input:       "User: {RAND;6;ABU} | Session: {RANDOM;32;HEX} | ID: {RAND;UUID} | Data: {RAND;50}",
 			expectedLen: map[string]int{"{RAND;6;ABU}": 6, "{RANDOM;32;HEX}": 64, "{RAND;UUID}": 36, "{RAND;50}": 50},
 			checkFunc: map[string]func(testing.TB, []byte){
-				"{RAND;6;ABU}":    func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsAlphabetUpper)) },
+				"{RAND;6;ABU}":    func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsAlphabetUpper) },
 				"{RANDOM;32;HEX}": checkHexFormat,
 				"{RAND;UUID}":     checkUUIDFormat,
-				"{RAND;50}":       func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsAll)) },
+				"{RAND;50}":       func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsAll) },
 			},
 		},
 		{
@@ -232,8 +236,8 @@ func TestRandomizer(t *testing.T) {
 			input:       "{RAND;3;DIGIT}{RAND;4;ABL}",
 			expectedLen: map[string]int{"{RAND;3;DIGIT}": 3, "{RAND;4;ABL}": 4},
 			checkFunc: map[string]func(testing.TB, []byte){
-				"{RAND;3;DIGIT}": func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsDigits)) },
-				"{RAND;4;ABL}":   func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsAlphabetLower)) },
+				"{RAND;3;DIGIT}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsDigits) },
+				"{RAND;4;ABL}":   func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsAlphabetLower) },
 			},
 		},
 		{
@@ -246,7 +250,7 @@ func TestRandomizer(t *testing.T) {
 			name:        "Max Length",
 			input:       "Key: {RAND;99}",
 			expectedLen: map[string]int{"{RAND;99}": 99},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;99}": func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsAll)) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;99}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsAll) }},
 		},
 		{
 			name:        "Incomplete Tag Start (Literal)",
@@ -272,13 +276,117 @@ func TestRandomizer(t *testing.T) {
 			name:        "Only Placeholder",
 			input:       "{RAND;5;DIGIT}",
 			expectedLen: map[string]int{"{RAND;5;DIGIT}": 5},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;5;DIGIT}": func(tb testing.TB, b []byte) { checkCharset(tb, b, []byte(fastrand.CharsDigits)) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;5;DIGIT}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsDigits) }},
 		},
 		{
 			name:        "Placeholder at End",
 			input:       "End with {RAND;UUID}",
 			expectedLen: map[string]int{"{RAND;UUID}": 36},
 			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;UUID}": checkUUIDFormat},
+		},
+		{
+			name:        "Length Range",
+			input:       "Data: {RAND;5-10;DIGIT}",
+			expectedLen: map[string]int{"{RAND;5-10;DIGIT}": -1},
+			checkFunc: map[string]func(testing.TB, []byte){"{RAND;5-10;DIGIT}": func(tb testing.TB, b []byte) {
+				if len(b) < 5 || len(b) > 10 {
+					tb.Errorf("Expected length between 5 and 10, got %d", len(b))
+				}
+				checkCharset(tb, b, fastrand.CharsDigits)
+			}},
+		},
+		{
+			name:        "Length Range Invalid (Fallback)",
+			input:       "Data: {RAND;15-5;ABU}",
+			expectedLen: map[string]int{"{RAND;15-5;ABU}": 16},
+			checkFunc: map[string]func(testing.TB, []byte){"{RAND;15-5;ABU}": func(tb testing.TB, b []byte) {
+				checkCharset(tb, b, fastrand.CharsAlphabetUpper)
+			}},
+		},
+		{
+			name:        "Keyword Choice",
+			input:       "Value: {RAND;UUID,IPV4,IPV6}",
+			expectedLen: map[string]int{"{RAND;UUID,IPV4,IPV6}": -1},
+			checkFunc: map[string]func(testing.TB, []byte){"{RAND;UUID,IPV4,IPV6}": func(tb testing.TB, b []byte) {
+				isUUID := uuidRegex.Match(b)
+				ip := net.ParseIP(string(b))
+				isIPv4 := ip != nil && ip.To4() != nil && !strings.Contains(string(b), ":")
+				isIPv6 := ip != nil && ip.To4() == nil && strings.Contains(string(b), ":")
+				if !isUUID && !isIPv4 && !isIPv6 {
+					tb.Errorf("Generated value %q is not a valid UUID, IPv4, or IPv6", string(b))
+				}
+			}},
+		},
+		{
+			name:        "Keyword Choice No Length",
+			input:       "{RAND;HEX,UUID}",
+			expectedLen: map[string]int{"{RAND;HEX,UUID}": -1},
+			checkFunc: map[string]func(testing.TB, []byte){"{RAND;HEX,UUID}": func(tb testing.TB, b []byte) {
+				if uuidRegex.Match(b) {
+					if len(b) != 36 {
+						tb.Errorf("Generated UUID %q has wrong length %d, expected 36", string(b), len(b))
+					}
+				} else if hexRegex.Match(b) {
+					if len(b) != 32 {
+						tb.Errorf("Generated HEX %q has wrong length %d, expected 32", string(b), len(b))
+					}
+				} else {
+					tb.Errorf("Generated value %q is not a valid UUID or HEX", string(b))
+				}
+			}},
+		},
+		{
+			name:        "Combined Range and Choice",
+			input:       "{RAND;8-12;HEX,ABL}",
+			expectedLen: map[string]int{"{RAND;8-12;HEX,ABL}": -1},
+			checkFunc: map[string]func(testing.TB, []byte){"{RAND;8-12;HEX,ABL}": func(tb testing.TB, b []byte) {
+				isHex := hexRegex.Match(b)
+				isABL := true
+				for _, char := range b {
+					if !bytes.Contains([]byte(fastrand.CharsAlphabetLower), []byte{char}) {
+						isABL = false
+						break
+					}
+				}
+				if isHex {
+					if len(b) < 16 || len(b) > 24 || len(b)%2 != 0 {
+						tb.Errorf("Generated HEX value %q has invalid length %d, expected between 16 and 24 and even", string(b), len(b))
+					}
+				} else if isABL {
+					if len(b) < 8 || len(b) > 12 {
+						tb.Errorf("Generated ABL value %q has invalid length %d, expected between 8 and 12", string(b), len(b))
+					}
+				} else {
+					tb.Errorf("Generated value %q is not valid HEX or ABL", string(b))
+				}
+			}},
+		},
+		{
+			name:        "URL-encoded Range and Choice",
+			input:       "Data: %7BRANDOM%3B10-20%3BDIGIT,ABL%7D",
+			expectedLen: map[string]int{"%7BRANDOM%3B10-20%3BDIGIT,ABL%7D": -1},
+			checkFunc: map[string]func(testing.TB, []byte){"%7BRANDOM%3B10-20%3BDIGIT,ABL%7D": func(tb testing.TB, b []byte) {
+				if len(b) < 10 || len(b) > 20 {
+					tb.Errorf("Expected length between 10 and 20, got %d", len(b))
+				}
+				isDigit := true
+				for _, char := range b {
+					if !bytes.Contains([]byte(fastrand.CharsDigits), []byte{char}) {
+						isDigit = false
+						break
+					}
+				}
+				isABL := true
+				for _, char := range b {
+					if !bytes.Contains([]byte(fastrand.CharsAlphabetLower), []byte{char}) {
+						isABL = false
+						break
+					}
+				}
+				if !isDigit && !isABL {
+					tb.Errorf("Generated value %q is not valid DIGIT or ABL", string(b))
+				}
+			}},
 		},
 	}
 
@@ -309,10 +417,8 @@ func TestRandomizer(t *testing.T) {
 				}
 
 			} else if len(tc.expectedLen) > 0 && len(placeholderMatches) == 0 {
-
 				t.Fatalf("Test setup error: Placeholders expected but none found by regex in input: %q: %s", tc.input, resultStr)
 			} else if len(tc.expectedLen) == 0 && len(placeholderMatches) == 0 {
-
 				if resultStr != tc.input {
 					t.Errorf("Expected output %q to match input %q when no placeholders are processed, got %q", tc.input, tc.input, resultStr)
 				}
@@ -320,6 +426,9 @@ func TestRandomizer(t *testing.T) {
 			}
 
 			placeholders := findPlaceholderRegex.FindAllString(tc.input, -1)
+			if len(placeholders) != len(placeholderMatches) {
+				t.Fatalf("Regex match count mismatch: FindAllStringIndex returned %d, FindAllString returned %d", len(placeholderMatches), len(placeholders))
+			}
 
 			lastInputIndex := 0
 			currentResultIndex := 0
@@ -381,12 +490,7 @@ func TestRandomizer(t *testing.T) {
 						potentialEndIndex := actualReplacementStartIndex + expectedLen
 						if potentialEndIndex < actualReplacementEndIndex {
 							actualReplacementEndIndex = potentialEndIndex
-						} else if potentialEndIndex > actualReplacementEndIndex {
-
 						}
-					} else {
-
-						t.Errorf("[%s] Cannot reliably determine boundary for adjacent placeholder with variable length. Check test setup or function logic.", placeholder)
 					}
 				}
 
@@ -407,12 +511,10 @@ func TestRandomizer(t *testing.T) {
 							checkFunc(st, replacementBytes)
 						})
 					} else if len(replacementBytes) == 0 && (!lenDefined || expectedLen != 0) {
-
 						t.Errorf("Placeholder %q: Replacement is empty but expected length was %d (or variable > 0).", placeholder, expectedLen)
 					}
 
 				} else if !funcDefined && (!lenDefined || expectedLen > 0) {
-
 					if placeholder != "{RAND;10;BYTES}" {
 						t.Logf("Warning: No check function defined for placeholder %q", placeholder)
 					}
@@ -444,12 +546,10 @@ func TestRandomizer(t *testing.T) {
 }
 
 func BenchmarkRandomizer(b *testing.B) {
-
-	payload := []byte("User: {RAND;10;ABL} | Session: {RANDOM;32;HEX} | ID: {RAND;UUID} | IP: {RAND;IPV4} | Data: {RAND;50} --- End")
+	payload := []byte("User: {RAND;10-20;ABL,ABU} | Session: {RANDOM;32;HEX} | ID: {RAND;UUID,HEX} | IP: {RAND;IPV4} | Data: {RAND;50-99} --- End")
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-
 		_ = fastrand.Randomizer(payload)
 	}
 }

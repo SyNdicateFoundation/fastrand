@@ -171,6 +171,7 @@ fastrand.Shuffle(len(numbers), func(i, j int) {
 })
 fmt.Printf("Shuffled: %v\n", numbers)
 ```
+
 ### Network and IDs
 
 ```go
@@ -193,10 +194,10 @@ fmt.Printf("IPv4: %s\nIPv6: %s\nFast UUID: %x\nSecure UUID: %x\n", ip4, ip6, uui
 
 The `Randomizer` is the most powerful feature for complex data generation. It parses a byte slice or string and replaces placeholders with random data.
 
-**Placeholder Format:** `{RAND[OM];[LENGTH];[TYPE]}`
+**Placeholder Format:** `{RAND[OM];[LENGTH_OR_RANGE];[TYPE_OR_CHOICE]}`
 - `OM`: Optional, `{RANDOM...}` works too.
-- `LENGTH`: Optional integer. Defaults vary by type.
-- `TYPE`: Optional keyword. Defaults to `CharsAll`.
+- `LENGTH_OR_RANGE`: Optional. Can be a single integer (e.g., `8`) or a range (e.g., `5-12`). Defaults vary by type.
+- `TYPE_OR_CHOICE`: Optional keyword. Can be a single type (e.g., `HEX`) or a comma-separated list of choices (e.g., `UUID,EMAIL`). Defaults to `CharsAll`.
 
 **Available Types:**
 `ABL`, `ABU`, `ABR`, `DIGIT`, `HEX`, `UUID`, `IPV4`, `IPV6`, `EMAIL`, `BYTES`, `SPACE`, `NULL`.
@@ -214,18 +215,44 @@ template := "POST /api/v1/data HTTP/1.1\n" +
 // Generate the final data
 randomizedRequest := fastrand.RandomizerString(template)
 
-fmt.Println(randomizedRequest)
+fmt.Println(randomizedRequest)```
 ```
 
-**Output of the `Randomizer` example:**
+#### Advanced Features: Ranges and Choices
+
+The Randomizer engine supports more dynamic generation using length ranges and random keyword choices.
+
+**Length Ranges**
+
+You can specify a range for the length by separating two numbers with a hyphen. The engine will generate a random length within that inclusive range for each replacement.
+
+```go
+// Generates a random numeric string between 5 and 15 characters long
+output := fastrand.RandomizerString("User ID: {RAND;5-15;DIGIT}")
+// Possible output: "User ID: 82195" or "User ID: 910482611"
+fmt.Println(output)
 ```
-POST /api/v1/data HTTP/1.1
-Host: example.com
-User-Agent: Client/821
-X-Request-ID: 7d3c9a1b-9e4f-4a8d-8c1b-2f3a4e5d6f7a
-X-Forwarded-For: 198.51.100.27
-Authorization: Bearer 8a3f2b1e9c4d58a3b1e9f4a2c8d7e6f5d4c3b2a1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5
-{"user_id": "qwerasdf", "data": "A9s(d!f@g#h$j%k^l&"}
+
+**Random Keyword Choices**
+
+Provide a comma-separated list of types, and the engine will randomly pick one to execute. This is useful for generating varied data structures.
+
+```go
+// Randomly generates a UUID, an IPv4 address, or an email
+output := fastrand.RandomizerString("Identifier: {RAND;UUID,IPV4,EMAIL}")
+// Possible output: "Identifier: 2a13b5-..." or "Identifier: 192.0.2.14"
+fmt.Println(output)
+```
+
+**Combining Ranges and Choices**
+
+You can combine both features in a single placeholder for maximum flexibility.
+
+```go
+// Generates a hex string or a lowercase alpha string, with a length between 10 and 20.
+// Note: for HEX, the length corresponds to the number of source bytes, resulting in 2x the characters.
+output := fastrand.RandomizerString("Token: {RAND;10-20;HEX,ABL}")
+fmt.Println(output)
 ```
 
 ## Performance

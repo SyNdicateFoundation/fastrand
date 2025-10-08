@@ -4,9 +4,8 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/hex"
-	"strconv"
+	"math/rand"
 	"strings"
-	"unsafe"
 )
 
 var (
@@ -20,6 +19,7 @@ var mailProviders string
 func init() {
 	lines := strings.Split(mailProviders, "\n")
 	SafeMailProviders = make([]string, 0, len(lines))
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed != "" {
@@ -29,35 +29,88 @@ func init() {
 }
 
 var (
-	startTag    = []byte("{RAND")
-	startTagOpt = []byte("OM")
-	endTag      = byte('}')
-	sepTag      = byte(';')
-	kwABL       = []byte("ABL")
-	kwABU       = []byte("ABU")
-	kwABR       = []byte("ABR")
-	kwDIGIT     = []byte("DIGIT")
-	kwHEX       = []byte("HEX")
-	kwSPACE     = []byte("SPACE")
-	kwUUID      = []byte("UUID")
-	kwNULL      = []byte("NULL")
-	kwIPV4      = []byte("IPV4")
-	kwIPV6      = []byte("IPV6")
-	kwBYTES     = []byte("BYTES")
-	kwEMAIL     = []byte("EMAIL")
+	startTag         = []byte("{RAND")
+	startUrlEncoded  = []byte("%7BRAND")
+	startHtmlEncoded = []byte("&lbrace;RAND")
+	startTagOpt      = []byte("OM")
+	endTag           = byte('}')
+	endTagUrl        = []byte("%7D")
+	endTagHtml       = []byte("&rbrace;")
+	sepTag           = byte(';')
+	sepTagUrl        = []byte("%3B")
+	sepTagHtml       = []byte("&semi;")
+	kwABL            = []byte("ABL")
+	kwABU            = []byte("ABU")
+	kwABR            = []byte("ABR")
+	kwDIGIT          = []byte("DIGIT")
+	kwHEX            = []byte("HEX")
+	kwSPACE          = []byte("SPACE")
+	kwUUID           = []byte("UUID")
+	kwNULL           = []byte("NULL")
+	kwIPV4           = []byte("IPV4")
+	kwIPV6           = []byte("IPV6")
+	kwBYTES          = []byte("BYTES")
+	kwEMAIL          = []byte("EMAIL")
 )
 
 const defaultLength = 16
 const maxLen = 99
+
+func hasPrefix(slice, prefix []byte, pos int) bool {
+	if pos+len(prefix) > len(slice) {
+		return false
+	}
+	return bytes.Equal(slice[pos:pos+len(prefix)], prefix)
+}
 
 func RandomizerString(payload string) string {
 	return string(Randomizer([]byte(payload)))
 }
 
 func Randomizer(payload []byte) []byte {
-	if !bytes.Contains(payload, startTag) {
+	if !bytes.ContainsAny(payload, "{%&") {
 		return payload
 	}
+
+	if bytes.ContainsAny(payload, "%&") {
+		var normalizedBuf bytes.Buffer
+		normalizedBuf.Grow(len(payload))
+		cursor := 0
+		for cursor < len(payload) {
+			idx := bytes.IndexAny(payload[cursor:], "%&")
+			if idx == -1 {
+				normalizedBuf.Write(payload[cursor:])
+				break
+			}
+			normalizedBuf.Write(payload[cursor : cursor+idx])
+			cursor += idx
+
+			if hasPrefix(payload, startUrlEncoded, cursor) {
+				normalizedBuf.Write(startTag)
+				cursor += len(startUrlEncoded)
+			} else if hasPrefix(payload, startHtmlEncoded, cursor) {
+				normalizedBuf.Write(startTag)
+				cursor += len(startHtmlEncoded)
+			} else if hasPrefix(payload, endTagUrl, cursor) {
+				normalizedBuf.WriteByte(endTag)
+				cursor += len(endTagUrl)
+			} else if hasPrefix(payload, endTagHtml, cursor) {
+				normalizedBuf.WriteByte(endTag)
+				cursor += len(endTagHtml)
+			} else if hasPrefix(payload, sepTagUrl, cursor) {
+				normalizedBuf.WriteByte(sepTag)
+				cursor += len(sepTagUrl)
+			} else if hasPrefix(payload, sepTagHtml, cursor) {
+				normalizedBuf.WriteByte(sepTag)
+				cursor += len(sepTagHtml)
+			} else {
+				normalizedBuf.WriteByte(payload[cursor])
+				cursor++
+			}
+		}
+		payload = normalizedBuf.Bytes()
+	}
+
 	var buffer bytes.Buffer
 	buffer.Grow(len(payload) + defaultLength*4)
 	cursor := 0
@@ -78,20 +131,24 @@ func Randomizer(payload []byte) []byte {
 		endIndex += cursor
 		tag := payload[cursor:endIndex]
 		cursor = endIndex + 1
-		parseAndReplace(tag, &buffer)
+
+		parseAndReplaceFast(tag, &buffer)
 	}
+
 	return buffer.Bytes()
 }
 
-func parseAndReplace(tag []byte, buffer *bytes.Buffer) {
+func parseAndReplaceFast(tag []byte, buffer *bytes.Buffer) {
 	tag = tag[len(startTag):]
 	if bytes.HasPrefix(tag, startTagOpt) {
 		tag = tag[len(startTagOpt):]
 	}
+
 	if len(tag) == 0 {
 		buffer.WriteString(String(defaultLength, CharsAll))
 		return
 	}
+
 	if tag[0] != sepTag {
 		buffer.Write(startTag)
 		if bytes.HasPrefix(tag, startTagOpt) {
@@ -100,22 +157,44 @@ func parseAndReplace(tag []byte, buffer *bytes.Buffer) {
 		buffer.Write(tag)
 		return
 	}
+
 	tag = tag[1:]
-	parts := bytes.SplitN(tag, []byte{sepTag}, 2)
+
 	length := defaultLength
-	var typeKeyword []byte
-	if len(parts) == 1 {
-		if l, err := parseLength(parts[0]); err == nil {
-			length = l
-		} else {
-			typeKeyword = parts[0]
-		}
-	} else if len(parts) == 2 {
-		if l, err := parseLength(parts[0]); err == nil {
-			length = l
-		}
-		typeKeyword = parts[1]
+	var typeKeyword, lenPart []byte
+
+	sepIndex := bytes.IndexByte(tag, sepTag)
+
+	if sepIndex == -1 {
+		lenPart = tag
+	} else {
+		lenPart = tag[:sepIndex]
+		typeKeyword = tag[sepIndex+1:]
 	}
+
+	rangeSepIndex := bytes.IndexByte(lenPart, '-')
+	if rangeSepIndex != -1 {
+		minPart := lenPart[:rangeSepIndex]
+		maxPart := lenPart[rangeSepIndex+1:]
+
+		if minX, ok1 := parseLengthFast(minPart); ok1 {
+			if maxX, ok2 := parseLengthFast(maxPart); ok2 && minX <= maxX && maxX <= maxLen {
+				length = rand.Intn(maxX-minX+1) + minX
+			}
+		}
+	} else {
+		if l, ok := parseLengthFast(lenPart); ok && l > 0 && l <= maxLen {
+			length = l
+		} else if typeKeyword == nil {
+			typeKeyword = lenPart
+		}
+	}
+
+	if bytes.Contains(typeKeyword, []byte(",")) {
+		choices := bytes.Split(typeKeyword, []byte(","))
+		typeKeyword = choices[rand.Intn(len(choices))]
+	}
+
 	switch {
 	case bytes.Equal(typeKeyword, kwABL):
 		buffer.WriteString(String(length, CharsAlphabetLower))
@@ -163,29 +242,34 @@ func generateUUID() []byte {
 	return b
 }
 
-func parseLength(b []byte) (int, error) {
-	if len(b) == 0 || len(b) > 2 {
-		return 0, strconv.ErrSyntax
+func parseLengthFast(b []byte) (int, bool) {
+	if len(b) == 1 {
+		c := b[0]
+		if c >= '0' && c <= '9' {
+			return int(c - '0'), true
+		}
 	}
-	val, err := strconv.Atoi(*(*string)(unsafe.Pointer(&b)))
-	if err != nil {
-		return 0, err
+	if len(b) == 2 {
+		c1, c2 := b[0], b[1]
+		if c1 >= '0' && c1 <= '9' && c2 >= '0' && c2 <= '9' {
+			return int(c1-'0')*10 + int(c2-'0'), true
+		}
 	}
-	if val > 0 && val <= maxLen {
-		return val, nil
-	}
-	return 0, strconv.ErrRange
+
+	return 0, false
 }
 
 func generateRandomEmail(userLength int) []byte {
 	if userLength <= 0 {
 		userLength = 8
 	}
+
 	user := String(userLength, CharsAlphabetLower)
 	provider := "gmail.com"
 	if len(SafeMailProviders) > 0 {
 		provider = Choice(SafeMailProviders)
 	}
+
 	return []byte(user + "@" + provider)
 }
 
@@ -193,8 +277,10 @@ func generateRandomHex(byteLength int) []byte {
 	if byteLength <= 0 {
 		byteLength = defaultLength
 	}
+
 	srcBytes := Bytes(byteLength)
 	hexBytes := make([]byte, byteLength*2)
 	hex.Encode(hexBytes, srcBytes)
+
 	return hexBytes
 }
