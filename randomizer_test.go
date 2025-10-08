@@ -169,7 +169,7 @@ func TestRandomizer(t *testing.T) {
 			name:        "Space",
 			input:       "A{RAND;5;SPACE}B",
 			expectedLen: map[string]int{"{RAND;5;SPACE}": 5},
-			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;5;SPACE}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsList(" ")) }},
+			checkFunc:   map[string]func(testing.TB, []byte){"{RAND;5;SPACE}": func(tb testing.TB, b []byte) { checkCharset(tb, b, fastrand.CharsSpace) }},
 		},
 		{
 			name:        "UUID",

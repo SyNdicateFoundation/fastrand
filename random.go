@@ -21,6 +21,7 @@ var (
 	CharsAlphabetLower  = CharsList("abcdefghijklmnopqrstuvwxyz")
 	CharsAlphabetUpper  = CharsList("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	CharsDigits         = CharsList("0123456789")
+	CharsSpace          = CharsList(" ")
 	CharsAlphabet       = append(CharsAlphabetLower, CharsAlphabetUpper...)
 	CharsAlphabetDigits = append(CharsAlphabet, CharsDigits...)
 	CharsAll            = append(CharsAlphabetDigits, CharsSymbolChars...)
