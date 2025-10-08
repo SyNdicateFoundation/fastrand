@@ -54,7 +54,6 @@ var (
 )
 
 const defaultLength = 16
-const maxLen = 99
 
 func hasPrefix(slice, prefix []byte, pos int) bool {
 	if pos+len(prefix) > len(slice) {
@@ -178,12 +177,12 @@ func parseAndReplaceFast(tag []byte, buffer *bytes.Buffer) {
 		maxPart := lenPart[rangeSepIndex+1:]
 
 		if minX, ok1 := parseLengthFast(minPart); ok1 {
-			if maxX, ok2 := parseLengthFast(maxPart); ok2 && minX <= maxX && maxX <= maxLen {
+			if maxX, ok2 := parseLengthFast(maxPart); ok2 && minX <= maxX {
 				length = rand.Intn(maxX-minX+1) + minX
 			}
 		}
 	} else {
-		if l, ok := parseLengthFast(lenPart); ok && l > 0 && l <= maxLen {
+		if l, ok := parseLengthFast(lenPart); ok && l > 0 {
 			length = l
 		} else if typeKeyword == nil {
 			typeKeyword = lenPart
