@@ -23,7 +23,7 @@ const (
 type CustomKeywordGenerator func(length int) []byte
 
 var (
-	defaultEngine     *Engine
+	defaultEngine     *FastEngine
 	SafeMailProviders []string
 	allKeywords       = []string{
 		"ABL", "ABU", "ABR", "DIGIT", "HEX", "SPACE", "UUID",
@@ -53,11 +53,11 @@ func Randomizer(payload []byte) []byte {
 	return defaultEngine.Randomizer(payload)
 }
 
-func (e *Engine) RandomizerString(payload string) string {
+func (e *FastEngine) RandomizerString(payload string) string {
 	return string(e.Randomizer([]byte(payload)))
 }
 
-func (e *Engine) Randomizer(payload []byte) []byte {
+func (e *FastEngine) Randomizer(payload []byte) []byte {
 	if !bytes.ContainsAny(payload, "{%&") && e.outputEncoding == RandomizerEncodingNone {
 		return payload
 	}
@@ -96,7 +96,7 @@ func (e *Engine) Randomizer(payload []byte) []byte {
 	return result
 }
 
-func (e *Engine) writeEncoded(buffer *bytebufferpool.ByteBuffer, data []byte) {
+func (e *FastEngine) writeEncoded(buffer *bytebufferpool.ByteBuffer, data []byte) {
 	if len(data) == 0 {
 		return
 	}
@@ -110,7 +110,7 @@ func (e *Engine) writeEncoded(buffer *bytebufferpool.ByteBuffer, data []byte) {
 	}
 }
 
-func (e *Engine) parseAndReplaceFast(tag []byte, buffer *bytebufferpool.ByteBuffer) {
+func (e *FastEngine) parseAndReplaceFast(tag []byte, buffer *bytebufferpool.ByteBuffer) {
 	tag = tag[len(startTag):]
 	if bytes.HasPrefix(tag, startTagOpt) {
 		tag = tag[len(startTagOpt):]
@@ -274,14 +274,14 @@ func (e *Engine) parseAndReplaceFast(tag []byte, buffer *bytebufferpool.ByteBuff
 	}
 }
 
-func (e *Engine) getCharset(keyword []byte, fallback CharsList) CharsList {
+func (e *FastEngine) getCharset(keyword []byte, fallback CharsList) CharsList {
 	if cs, ok := e.customCharsets[string(keyword)]; ok {
 		return cs
 	}
 	return fallback
 }
 
-func (e *Engine) generateRandomEmail(userLength int) []byte {
+func (e *FastEngine) generateRandomEmail(userLength int) []byte {
 	if userLength <= 0 {
 		userLength = 8
 	}
